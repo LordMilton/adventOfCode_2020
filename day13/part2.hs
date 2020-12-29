@@ -40,26 +40,39 @@ maybeListMax :: Ord a => [Maybe a] -> Maybe a
 maybeListMax (x:xs) = maybeMax x (maybeListMax xs)
 maybeListMax _      = Nothing
 
-makeBusPairs :: [Maybe Integer] -> Integer -> [(Integer,Integer)]
-makeBusPairs (x:xs) i = case x of
-                           Nothing -> makeBusPairs xs (i+1)
-                           Just v  -> (v,i):(makeBusPairs xs (i+1))
-makeBusPairs _      _ = []
+makeBusPairs :: [Maybe Integer] -> Integer -> ([Integer],[Integer])
+makeBusPairs (x:xs) i = let rest = makeBusPairs xs (i+1) in
+                           case x of
+                              Nothing -> rest
+                              Just v  -> (v:(fst rest), i:(snd rest))
+makeBusPairs _      _ = ([],[])
+
+powerProducts :: [Integer] -> [Integer] -> [Integer]
+powerProducts nums (x:xs) = (powerProduct nums x):(powerProducts nums xs)
+powerProducts _    _      = []
+
+powerProduct :: [Integer] -> Integer -> Integer
+powerProduct (x:xs) num |  x /= num = x * (powerProduct xs num)
+                        |  otherwise= powerProduct xs num
+powerProduct _      _   =  1
+
+modInverses :: [Integer] -> [Integer] -> [Integer]
+modInverses (num:nums) (pProd:pProds) = (modInverse num pProd 1):(modInverses nums pProds)
+modInverses _          _              = []
+
+modInverse :: Integer -> Integer -> Integer -> Integer
+modInverse num pProd potInv | (mod (pProd * potInv) num) == 1  = potInv
+                            | otherwise                        = modInverse num pProd (potInv + 1)
 
 solve :: [Maybe Integer] -> Integer
-solve buses =  let maxBus = fromJust (maybeListMax buses) in
-               let maxIndex = toInteger (fromJust (elemIndex (Just maxBus) buses)) in
-               let busOrder = makeBusPairs buses 0 in
-               let start = suggestedStart - (mod suggestedStart maxBus) - maxIndex in
-                  --start
-                  run start maxBus busOrder
-                  
-run :: Integer -> Integer -> [(Integer,Integer)] -> Integer
-run start inc buses =   let valid = checkTimestamp (myTrace ("checking " ++ (show start)) start) buses in
-                           case valid of
-                              True  -> start
-                              False -> run (start + inc) inc buses
-                              
-checkTimestamp :: Integer -> [(Integer,Integer)] -> Bool
-checkTimestamp time ((id,index):buses) = ((mod (time + index) id) == 0) && (checkTimestamp time buses)
-checkTimestamp _    _                  = True
+solve buses =  let busOrder = myTrace (show (makeBusPairs buses 0)) (makeBusPairs buses 0) in
+               let nums = fst busOrder in
+               let rems = snd busOrder in
+               let prod = foldl (*) 1 nums in
+               let powerProds = powerProducts nums nums in
+               let modInvs = modInverses nums powerProds in
+                  mod (combine rems powerProds modInvs) prod
+
+combine :: [Integer] -> [Integer] -> [Integer] -> Integer
+combine (rem:rems) (pProd:pProds) (inv:modInvs) = (rem * pProd * inv) + (combine rems pProds modInvs)
+combine _          _              _             = 0
